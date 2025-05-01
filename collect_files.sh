@@ -12,6 +12,8 @@ if [[ $# -lt 2 || $# -gt 4 ]]; then
   usage
 fi
 
+#Проверка
+
 # Parse positional arguments
 input_dir="$1"
 output_dir="$2"
