@@ -37,59 +37,42 @@ fi
 # Create output directory if needed
 mkdir -p "$output_dir"
 
-copy_with_depth() {
+copy_with_rename() {
   local src="$1"
-  local rel_path="${src#$input_dir/}"
-  local target_dir="$output_dir"
-  
-  # If max_depth is specified, calculate relative path components
-  if [[ -n $max_depth ]]; then
-    IFS='/' read -ra parts <<< "$rel_path"
-    local depth=$(( ${#parts[@]} - 1 ))
-    
-    # If file is deeper than max_depth, skip it
-    if [[ $depth -gt $max_depth ]]; then
-      return
-    fi
-    
-    # Reconstruct target path with limited depth
-    target_dir="$output_dir"
-    for (( i=0; i<depth; i++ )); do
-      target_dir="$target_dir/${parts[$i]}"
-    done
-    mkdir -p "$target_dir"
+  local filename base ext target n
+  filename=$(basename "$src")
+  # split base and extension
+  if [[ "$filename" == *.* && "${filename%%.*}" != "$filename" ]]; then
+    base="${filename%.*}"
+    ext=".${filename##*.}"
+  else
+    base="$filename"
+    ext=""
   fi
-  
-  local filename=$(basename "$src")
-  cp "$src" "$target_dir/$filename"
+
+  target="$output_dir/$filename"
+  if [[ -e "$target" ]]; then
+    n=1
+    while [[ -e "$output_dir/${base}-${n}${ext}" ]]; do
+      ((n++))
+    done
+    cp "$src" "$output_dir/${base}-${n}${ext}"
+  else
+    cp "$src" "$output_dir/$filename"
+  fi
 }
 
 # Find and copy files
 if [[ -n $max_depth ]]; then
-  find "$input_dir" -type f -print0 | while IFS= read -r -d '' file; do
-    copy_with_depth "$file"
-  done
-else
-  # Flat copy if no max_depth specified
-  find "$input_dir" -type f -print0 | while IFS= read -r -d '' file; do
-    filename=$(basename "$file")
-    # Handle duplicate filenames
-    n=1
-    base="${filename%.*}"
-    ext="${filename##*.}"
-    if [[ "$ext" == "$filename" ]]; then
-      ext=""
-    else
-      ext=".$ext"
-    fi
-    
-    target="$output_dir/$filename"
-    while [[ -e "$target" ]]; do
-      target="$output_dir/${base}-${n}${ext}"
-      ((n++))
+  find "$input_dir" -maxdepth "$max_depth" -type f -print0 | \
+    while IFS= read -r -d '' file; do
+      copy_with_rename "$file"
     done
-    cp "$file" "$target"
-  done
+else
+  find "$input_dir" -type f -print0 | \
+    while IFS= read -r -d '' file; do
+      copy_with_rename "$file"
+    done
 fi
 
-echo "Operation completed successfully"
+echo "All files have been copied to '$output_dir'" 
